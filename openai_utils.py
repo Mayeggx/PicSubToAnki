@@ -1,5 +1,19 @@
 import json
+import sys
+import tkinter as tk
+from tkinter import messagebox
 from openai import OpenAI
+
+
+class OpenAIExplanation:
+    def __init__(self, api_key, base_url, model_name):
+        self.api_key = api_key
+        self.base_url = base_url
+        self.model_name = model_name
+        self.mode = "jp"
+        self.client = self._init_client()
+
+
 
 
 class OpenAIExplanation:
@@ -12,10 +26,21 @@ class OpenAIExplanation:
 
     def _init_client(self):
         """初始化 OpenAI 客户端"""
-        return OpenAI(
-            api_key=self.api_key,
-            base_url=self.base_url
-        )
+        try:
+            return OpenAI(
+                api_key=self.api_key,
+                base_url=self.base_url
+            )
+        except Exception as e:
+            # 创建一个隐藏的主窗口
+            root = tk.Tk()
+            root.withdraw()
+            # 显示错误弹窗
+            messagebox.showerror("初始化失败", f"OpenAI 客户端初始化失败: {str(e)}")
+            sys.exit(1)  # 显示错误信息并退出程序，返回状态码 1 表示异常退出
+
+    # ... 已有代码 ...
+
 
     def construct_single_prompt_jp(self, subtitle, key):
         """构造单个查询的提示词"""
