@@ -2,3 +2,5 @@
 /build/
 /venv/
 /tem.txt
+/.idea/
+/_pycache_/
