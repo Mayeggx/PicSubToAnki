@@ -7,6 +7,7 @@ class OpenAIExplanation:
         self.api_key = api_key
         self.base_url = base_url
         self.model_name = model_name
+        self.mode = "jp"
         self.client = self._init_client()
 
     def _init_client(self):
@@ -16,7 +17,7 @@ class OpenAIExplanation:
             base_url=self.base_url
         )
 
-    def construct_single_prompt(self, subtitle, key):
+    def construct_single_prompt_jp(self, subtitle, key):
         """构造单个查询的提示词"""
         return f"""请根据提供的单词返回以下结构化信息：
 1. 日文单词原型（如果是变形，返回原形）
@@ -42,7 +43,33 @@ class OpenAIExplanation:
 单词：{key}
 请给出对应的输出"""
 
-    def construct_batch_prompt(self, pairs):
+    def construct_single_prompt_en(self, subtitle, key):
+            """构造单个查询的提示词"""
+            return f"""请根据提供的单词返回以下结构化信息：
+    1. 英文单词原型（如果是变形，返回原形）
+    2. 单词的音标
+    3. 单词的英文释义（不包含单词本身，必须只有英文）
+    4. 当前的例句，并将和单词的部分用<b>{key}</b>的形式包围
+    5. 用中文结合语境解释一下当前单词的意思
+
+    示例输入：
+    例句：The Demon Sword's wavelength seems to be......swelling
+    单词：swelling
+    （单词存在于例句之中）
+    示例格式：
+    {{
+        "单词": "swell",
+        "音标": "英[swel]美[swɛl]",
+        "意义": "to expand or increase in intensity, size, or power, often implying a gradual or ominous buildup",
+        "例句": "The Demon Sword's wavelength seems to be......<b>swelling</b>",
+        "笔记": ""swelling" 在这里并非指物理上的“膨胀”，而是形容恶魔之剑的“波长”（可能指其能量波动或魔力）正在增强、扩大或变得不稳定。这暗示剑的力量在逐渐蓄积或失控，可能预示着即将爆发的危险或更强大的攻击性"
+    }}
+    当前输入：
+    例句：{subtitle}
+    单词：{key}
+    请给出对应的输出"""
+
+    def construct_batch_prompt_jp(self, pairs):
         """构造批量查询的提示词（多对subtitle和key）"""
         pair_descriptions = []
         for i, (subtitle, key) in enumerate(pairs):
@@ -89,6 +116,53 @@ class OpenAIExplanation:
 {"".join(pair_descriptions)}
 """
 
+    def construct_batch_prompt_en(self, pairs):
+            """构造批量查询的提示词（多对subtitle和key）"""
+            pair_descriptions = []
+            for i, (subtitle, key) in enumerate(pairs):
+                pair_descriptions.append(f"""
+    对{i + 1}:
+    例句：{subtitle}
+    单词：{key}
+    """)
+
+            return f"""请根据提供的多组例句和单词，为每组返回以下结构化信息：
+    1. 英文单词原型（如果是变形，返回原形）
+    2. 单词的音标
+    3. 单词的英文释义（不包含单词本身，必须只有英文）
+    4. 当前的例句，并将和单词的部分用<b>{key}</b>的形式包围
+    5. 用中文结合语境解释一下当前单词的意思
+
+    请为每个例句-单词对返回独立的JSON对象，用数组格式返回所有结果：
+    示例输入：
+    对1:
+    例句：The Demon Sword's wavelength seems to be......swelling
+    单词：swelling
+    对2:
+    例句：We don't want to overlook any dormant mines
+    单词：dormant
+    示例格式：
+    [
+        {{
+            "单词": "swell",
+            "音标": "英[swel]美[swɛl]",
+            "意义": "to expand or increase in intensity, size, or power, often implying a gradual or ominous buildup",
+            "例句": "The Demon Sword's wavelength seems to be......<b>swelling</b>",
+            "笔记": "swelling在这里并非指物理上的“膨胀”，而是形容恶魔之剑的“波长”（可能指其能量波动或魔力）正在增强、扩大或变得不稳定。这暗示剑的力量在逐渐蓄积或失控，可能预示着即将爆发的危险或更强大的攻击性"
+        }},
+        {{
+            "单词": "dormant",
+            "音标": "英[ˈdɔ:mənt]美[ˈdɔrmənt]",
+            "意义": "temporarily inactive or inactive for a period of time, but with the potential to become active again",
+            "例句": "We don't want to overlook any <b>dormant</b> mines",
+            "笔记": "dormant在这里形容矿井暂时处于不活跃或停用状态，但仍有潜在危险。这些矿井可能未被完全废弃，虽然表面上看似安全，但内部可能残留爆炸物、有毒气体或结构隐患（如塌方风险）。"
+        }}
+    ]
+
+    需要分析的例句-单词对：
+    {"".join(pair_descriptions)}
+    """
+
     def parse_response(self, response_text):
         """解析响应文本，提取 JSON 数据"""
         try:
@@ -107,13 +181,19 @@ class OpenAIExplanation:
     def explain_single(self, subtitle, key):
         """调用 OpenAI API 解析单个单词信息"""
         try:
-            prompt = self.construct_single_prompt(subtitle, key)
+            if(self.mode == 'jp'):
+                prompt = self.construct_single_prompt_jp(subtitle, key)
+                language = "日语"
+            elif(self.mode == 'en'):
+                prompt = self.construct_single_prompt_en(subtitle, key)
+                language = "英语"
+
             print(f"正在查询单词：{key}")
 
             response = self.client.chat.completions.create(
                 model=self.model_name,
                 messages=[
-                    {"role": "system", "content": "你是一个专业的日语词典助手，能够准确返回单词信息的JSON格式数据"},
+                    {"role": "system", "content": f"你是一个专业的{language}词典助手，能够准确返回单词信息的JSON格式数据"},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.1,
@@ -148,14 +228,19 @@ class OpenAIExplanation:
         pairs = list(zip(subtitles, keys))
 
         try:
-            prompt = self.construct_batch_prompt(pairs)
+            if(self.mode == 'jp'):
+                prompt = self.construct_batch_prompt_jp(pairs)
+                language = "日语"
+            elif(self.mode == 'en'):
+                prompt = self.construct_batch_prompt_en(pairs)
+                language = "英语"
             print(f"正在批量查询 {len(pairs)} 对单词")
 
             response = self.client.chat.completions.create(
                 model=self.model_name,
                 messages=[
                     {"role": "system",
-                     "content": "你是一个专业的日语词典助手，能够准确返回多组单词信息的JSON格式数据数组"},
+                     "content": f"你是一个专业的{language}词典助手，能够准确返回多组单词信息的JSON格式数据数组"},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.1,

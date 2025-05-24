@@ -39,6 +39,17 @@ class ImageViewerApp:
         self.select_none_btn = ttk.Button(self.toolbar, text="取消全选", command=self.select_none)
         self.select_none_btn.pack(side=tk.LEFT, padx=5, pady=5)
 
+        # 新增：切换模式按钮（在取消全选按钮右侧）
+        self.toggle_mode_btn = ttk.Button(self.toolbar, text="切换模式", command=self.toggle_mode)
+        self.toggle_mode_btn.pack(side=tk.LEFT, padx=5, pady=5)
+
+        self.anki_connect = AnkiConnect()  # 初始化AnkiConnect实例
+        # 新增：模式显示标签（在切换模式按钮右侧）
+        current_mode = self.anki_connect.mode
+        mode_text = "日语模式" if current_mode == "jp" else "英语模式" if current_mode == "en" else "未知模式"
+        self.mode_label = ttk.Label(self.toolbar, text=mode_text)
+        self.mode_label.pack(side=tk.LEFT, padx=5, pady=5)
+
         # 创建主内容区域
         self.canvas = tk.Canvas(self.root)
         self.scrollbar = ttk.Scrollbar(self.root, orient=tk.VERTICAL, command=self.canvas.yview)
@@ -62,7 +73,7 @@ class ImageViewerApp:
             "model_name": "qwen-plus"
         }
         self.openai_client = None
-        self.anki_connect = AnkiConnect()  # 初始化AnkiConnect实例
+
 
     def on_canvas_configure(self, event):
         self.canvas.itemconfig("frame", width=event.width)
@@ -211,6 +222,21 @@ class ImageViewerApp:
         for check_var in self.check_vars:
             check_var.set(False)  # 设置为未选中状态
 
+    # 新增：切换模式方法
+    def toggle_mode(self):
+        current_mode = self.anki_connect.mode
+        new_mode = "en" if current_mode == "jp" else "jp"
+
+        self.anki_connect.set_mode(new_mode)
+        # 更新模式显示标签
+        mode_text = "日语模式" if new_mode == "jp" else "英语模式"
+        self.mode_label.config(text=mode_text)
+
+        if not self.openai_client:
+            print("第一次初始化OpenAI客户端")
+            self.openai_client = OpenAIExplanation(**self.openai_config)
+            self.anki_connect.openai_client = self.openai_client  # 传递给AnkiConnect
+        self.openai_client.mode = new_mode
 
 if __name__ == "__main__":
     root = tk.Tk()

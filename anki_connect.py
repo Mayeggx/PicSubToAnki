@@ -9,6 +9,23 @@ class AnkiConnect:
     def __init__(self, openai_client=None):
         self.openai_client = openai_client  # 接收OpenAI客户端实例
         self.folder_path = ""  # 图片文件夹路径（由main.py动态设置）
+        self.voice_url = ""
+        self.cards_name = ""
+        self.mode = ""
+        self.set_mode('jp')
+
+    def set_mode(self, newmode):
+        self.mode = newmode
+        if(self.mode == 'jp'):
+            self.cards_name = "日本語::ランダム::アニメ・マンガ・マスコミ"
+        elif(self.mode == 'en'):
+            self.cards_name = "English Vocabulary::A English Daily"
+
+    def make_voice_url(self, word, pronun):
+        if (self.mode == 'jp'):
+            return f'[sound:https://assets.languagepod101.com/dictionary/japanese/audiomp3.php?kanji={word}&kana={pronun}]'
+        elif (self.mode == 'en'):
+            return f'[sound:https://dict.youdao.com/dictvoice?audio={word}]'
 
     def anki_request(self, action, **params):
         """发送请求到AnkiConnect"""
@@ -82,11 +99,11 @@ class AnkiConnect:
                 "释义": result['meaning'],
                 "笔记": result['note'],
                 "例句": f'<img src="{compressed_filename}"><br>{result["example"]}',
-                "发音": f'[sound:https://assets.languagepod101.com/dictionary/japanese/audiomp3.php?kanji={result["word"]}&kana={result["pronunciation"]}]'
+                "发音": self.make_voice_url(result['word'],result['pronunciation'])
             }
 
             note = {
-                "deckName": "日本語::ランダム::アニメ・マンガ・マスコミ",
+                "deckName": self.cards_name,
                 "modelName": "划词助手Antimoon模板",
                 "fields": fields,
                 "options": {"allowDuplicate": True}
@@ -130,11 +147,11 @@ class AnkiConnect:
                     "释义": result['meaning'],
                     "笔记": result['note'],
                     "例句": f'<img src="{compressed_filename}"><br>{result["example"]}',
-                    "发音": f'[sound:https://assets.languagepod101.com/dictionary/japanese/audiomp3.php?kanji={result["word"]}&kana={result["pronunciation"]}]'
+                    "发音": self.make_voice_url(result['word'],result['pronunciation'])
                 }
 
                 note_data = {
-                    "deckName": "日本語::ランダム::アニメ・マンガ・マスコミ",
+                    "deckName": self.cards_name,
                     "modelName": "划词助手Antimoon模板",
                     "fields": fields,
                     "options": {"allowDuplicate": True}
