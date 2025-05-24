@@ -62,7 +62,7 @@ class OpenAIExplanation:
         "音标": "英[swel]美[swɛl]",
         "意义": "to expand or increase in intensity, size, or power, often implying a gradual or ominous buildup",
         "例句": "The Demon Sword's wavelength seems to be......<b>swelling</b>",
-        "笔记": ""swelling" 在这里并非指物理上的“膨胀”，而是形容恶魔之剑的“波长”（可能指其能量波动或魔力）正在增强、扩大或变得不稳定。这暗示剑的力量在逐渐蓄积或失控，可能预示着即将爆发的危险或更强大的攻击性"
+        "笔记": "「swelling」在这里并非指物理上的“膨胀”，而是形容恶魔之剑的波长（可能指其能量波动或魔力）正在增强、扩大或变得不稳定。这暗示剑的力量在逐渐蓄积或失控，可能预示着即将爆发的危险或更强大的攻击性"
     }}
     当前输入：
     例句：{subtitle}
@@ -148,14 +148,14 @@ class OpenAIExplanation:
             "音标": "英[swel]美[swɛl]",
             "意义": "to expand or increase in intensity, size, or power, often implying a gradual or ominous buildup",
             "例句": "The Demon Sword's wavelength seems to be......<b>swelling</b>",
-            "笔记": "swelling在这里并非指物理上的“膨胀”，而是形容恶魔之剑的“波长”（可能指其能量波动或魔力）正在增强、扩大或变得不稳定。这暗示剑的力量在逐渐蓄积或失控，可能预示着即将爆发的危险或更强大的攻击性"
+            "笔记": "「swelling」在这里并非指物理上的膨胀”，而是形容恶魔之剑的波长（可能指其能量波动或魔力）正在增强、扩大或变得不稳定。这暗示剑的力量在逐渐蓄积或失控，可能预示着即将爆发的危险或更强大的攻击性"
         }},
         {{
             "单词": "dormant",
             "音标": "英[ˈdɔ:mənt]美[ˈdɔrmənt]",
             "意义": "temporarily inactive or inactive for a period of time, but with the potential to become active again",
             "例句": "We don't want to overlook any <b>dormant</b> mines",
-            "笔记": "dormant在这里形容矿井暂时处于不活跃或停用状态，但仍有潜在危险。这些矿井可能未被完全废弃，虽然表面上看似安全，但内部可能残留爆炸物、有毒气体或结构隐患（如塌方风险）。"
+            "笔记": "「dormant」在这里形容矿井暂时处于不活跃或停用状态，但仍有潜在危险。这些矿井可能未被完全废弃，虽然表面上看似安全，但内部可能残留爆炸物、有毒气体或结构隐患（如塌方风险）。"
         }}
     ]
 
