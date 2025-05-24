@@ -7,6 +7,7 @@ import base64
 import json
 import threading  # 导入线程模块
 from openai_utils import OpenAIExplanation
+from anki_connect import AnkiConnect  # 新增导入
 
 
 class ImageViewerApp:
@@ -52,7 +53,8 @@ class ImageViewerApp:
             "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
             "model_name": "qwen-plus"
         }
-        self.openai_client = None  # 初始化为None，延迟初始化
+        self.openai_client = None
+        self.anki_connect = AnkiConnect()  # 初始化AnkiConnect实例
 
     def on_canvas_configure(self, event):
         self.canvas.itemconfig("frame", width=event.width)
@@ -67,6 +69,7 @@ class ImageViewerApp:
         self.check_vars = []  # 清空确认框状态
 
         self.folder_path = filedialog.askdirectory()  # 保存文件夹路径
+        self.anki_connect.folder_path = self.folder_path
         if not self.folder_path:
             return
 
@@ -133,251 +136,44 @@ class ImageViewerApp:
         self.content_frame.rowconfigure(len(image_files), weight=1)
 
     def handle_button_click(self, filename, input_entry, btn):
-        """按钮点击处理函数：验证输入并启动线程"""
         user_input = input_entry.get().strip()
         if not user_input:
             messagebox.showerror("输入错误", "请输入内容后再创建卡片")
-            return  # 阻止任务执行
+            return
 
-        btn.config(state="disabled")  # 输入有效时禁用按钮
-        threading.Thread(
-            target=self.create_anki_card,
-            args=(filename, user_input, btn),
-            daemon=True
-        ).start()
+        btn.config(state="disabled")
+        # 延迟初始化OpenAI客户端
+        if not self.openai_client:
+            print("第一次初始化OpenAI客户端")
+            self.openai_client = OpenAIExplanation(**self.openai_config)
+            self.anki_connect.openai_client = self.openai_client  # 传递给AnkiConnect
 
-    def anki_request(self, action, **params):
-        """发送请求到AnkiConnect"""
-        request_data = json.dumps({
-            'action': action,
-            'version': 6,
-            'params': params
-        })
-        try:
-            response = requests.post('http://localhost:8765', data=request_data)
-            return json.loads(response.text)
-        except Exception as e:
-            messagebox.showerror("连接错误", f"无法连接Anki: {str(e)}")
-            return None
-
-    def store_media_file(self, filename):
-        """将图片压缩为480p的jpg文件并存储到Anki媒体库"""
-        img_path = os.path.join(self.folder_path, filename)
-        base_name = os.path.splitext(filename)[0]
-        compressed_filename = f"{base_name}.jpg"  # 生成新的jpg文件名
-
-        try:
-            with Image.open(img_path) as img:
-                # 调整尺寸为480p（最大高度480，保持宽高比）
-                max_size = (320, 240)  # 480p常见分辨率854x480
-                img.thumbnail(max_size)
-
-                # 转换为RGB模式（处理RGBA图片）
-                if img.mode in ('RGBA', 'LA'):
-                    background = Image.new('RGB', img.size, (255, 255, 255))
-                    background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else img.split()[-1])
-                    img = background
-                else:
-                    img = img.convert('RGB')
-
-                # 保存到内存中的BytesIO
-                from io import BytesIO
-                img_buffer = BytesIO()
-                img.save(img_buffer, format='JPEG', quality=40)  # 调整质量参数
-                img_data = img_buffer.getvalue()
-
-                # base64编码
-                img_b64 = base64.b64encode(img_data).decode("utf-8")
-
-                # 上传到Anki
-                response = self.anki_request(
-                    'storeMediaFile',
-                    filename=compressed_filename,
-                    data=img_b64
-                )
-                return {'filename': compressed_filename, 'response': response}
-        except Exception as e:
-            print(f"压缩或上传图片失败: {img_path} - {e}")
-            return None
-
-    def create_anki_card(self, filename, user_input, btn):  # 新增按钮参数
-        """异步创建Anki卡片（使用压缩后的图片+文件名解释）"""
-        def async_task():
-            # 延迟初始化OpenAI客户端（首次调用时初始化）
-            if not self.openai_client:
-                print("第一次初始化OpenAI客户端")
-                self.openai_client = OpenAIExplanation(**self.openai_config)
-
-            # 调用DeepSeek API解释文件名
-            raw_name = os.path.splitext(filename)[0]
-            result = self.openai_client.explain_single(raw_name, user_input)
-            if result['error']:
-                print("返回失败")
-                # 操作失败时恢复按钮状态
-                self.root.after(0, btn.config, {'state': 'normal', 'bg': 'systembuttonface', 'text': '创建卡片'})
-                return
-
-            word = result['word']
-            pronunciation = result['pronunciation']
-            meaning = result['meaning']
-            example = result['example']
-            note = result['note']
-
-            # 存储压缩后的图片到Anki
-            media_result = self.store_media_file(filename)
-            if not media_result or media_result.get('response') is None or media_result.get('response').get('error'):
-                error_msg = media_result.get('response').get('error') if media_result else "未知错误"
-                self.root.after(0, messagebox.showerror, "图片上传失败", f"无法上传图片: {error_msg}")
-                # 操作失败时恢复按钮状态
-                self.root.after(0, btn.config, {'state': 'normal', 'bg': 'systembuttonface', 'text': '创建卡片'})
-                return
-
-            compressed_filename = media_result['filename']
-
-            # 构建卡片内容（使用压缩后的jpg文件名）
-            fields = {
-                "单词": word,
-                "音标": pronunciation,
-                "释义": meaning,
-                "笔记": note,
-                "例句": f'<img src="{compressed_filename}"><br>{example}',
-                "发音": f'[sound:https://assets.languagepod101.com/dictionary/japanese/audiomp3.php?kanji={word}&kana={pronunciation}]'
-            }
-
-            # 创建笔记
-            note = {
-                "deckName": "Default",
-                "modelName": "划词助手Antimoon模板",
-                "fields": fields,
-                "options": {
-                    "allowDuplicate": False
-                }
-            }
-
-            response = self.anki_request('addNote', note=note)
-            if response and not response.get('error'):
-                # 成功时修改按钮样式（保持禁用状态，仅改变视觉反馈）
-                self.root.after(0, btn.config, {'bg': 'green', 'text': '已创建'})
-            else:
-                error = response.get('error') if response else "未知错误"
-                self.root.after(0, messagebox.showerror, "创建失败", f"无法创建卡片: {error}")
-                # 操作失败时恢复按钮状态
-                self.root.after(0, btn.config, {'state': 'normal', 'bg': 'systembuttonface', 'text': '创建卡片'})
-
-        threading.Thread(target=async_task, daemon=True).start()
-
-    def create_anki_cards(self, filenames, user_inputs, buttons):
-        """异步批量创建Anki卡片"""
-
-        def async_task():
-            # 验证输入列表长度一致
-            if not filenames or len(filenames) != len(user_inputs) or len(filenames) != len(buttons):
-                self.root.after(0, lambda: messagebox.showerror("输入错误", "文件名、用户输入和按钮数量必须一致"))
-                for btn in buttons:
-                    self.root.after(0, btn.config, {'state': 'normal'})
-                return
-
-            # 准备批量查询
-            raw_names = [os.path.splitext(filename)[0] for filename in filenames]
-
-            # 延迟初始化OpenAI客户端（首次调用时初始化）
-            if not self.openai_client:
-                print("第一次初始化OpenAI客户端")
-                self.openai_client = OpenAIExplanation(**self.openai_config)
-
-            # 调用批量API解析单词
-            results = self.openai_client.explain_batch(raw_names, user_inputs)
-
-            # 处理API结果
-            success_count = 0
-            for i, (filename, user_input, btn, result) in enumerate(zip(filenames, user_inputs, buttons, results)):
-                if result.get('error'):
-                    print(f"第 {i + 1} 个单词解析失败: {result['error']}")
-                    # 保持按钮禁用，仅修改显示状态
-                    self.root.after(0, btn.config, {'state': 'disabled', 'bg': 'systembuttonface', 'text': '创建失败'})
-                    continue
-
-                word = result['word']
-                pronunciation = result['pronunciation']
-                meaning = result['meaning']
-                example = result['example']
-                note = result['note']
-
-                # 存储压缩后的图片到Anki
-                media_result = self.store_media_file(filename)
-                if not media_result or media_result.get('response') is None or media_result.get('response').get(
-                        'error'):
-                    error_msg = media_result.get('response').get('error') if media_result else "未知错误"
-                    self.root.after(0, messagebox.showerror, "图片上传失败", f"无法上传图片: {error_msg}")
-                    self.root.after(0, btn.config, {'state': 'normal', 'bg': 'systembuttonface', 'text': '创建失败'})
-                    continue
-
-                compressed_filename = media_result['filename']
-
-                # 构建卡片内容
-                fields = {
-                    "单词": word,
-                    "音标": pronunciation,
-                    "释义": meaning,
-                    "笔记": note,
-                    "例句": f'<img src="{compressed_filename}"><br>{example}',
-                    "发音": f'[sound:https://assets.languagepod101.com/dictionary/japanese/audiomp3.php?kanji={word}&kana={pronunciation}]'
-                }
-
-                # 创建笔记
-                note_data = {
-                    "deckName": "Default",
-                    "modelName": "划词助手Antimoon模板",
-                    "fields": fields,
-                    "options": {
-                        "allowDuplicate": False
-                    }
-                }
-
-                response = self.anki_request('addNote', note=note_data)
-                if response and not response.get('error'):
-                    success_count += 1
-                    # 保持按钮禁用，显示成功状态
-                    self.root.after(0, btn.config, {'state': 'disabled', 'bg': 'green', 'text': '已创建'})
-                else:
-                    error = response.get('error') if response else "未知错误"
-                    self.root.after(0, messagebox.showerror, "创建失败", f"无法创建卡片: {error}")
-                    # 保持按钮禁用，显示失败状态
-                    self.root.after(0, btn.config, {'state': 'disabled', 'bg': 'systembuttonface', 'text': '创建失败'})
-
-            # 全部处理完成后显示摘要
-            if success_count > 0:
-                self.root.after(0, lambda: messagebox.showinfo("批量创建结果",
-                                                               f"成功创建 {success_count}/{len(filenames)} 张卡片"))
-
-        threading.Thread(target=async_task, daemon=True).start()
+        self.anki_connect.create_anki_card(filename, user_input, btn)  # 调用新模块方法
 
     def batch_add_cards(self):
-        """处理批量添加按钮点击事件"""
-        # 收集选中的行
         selected = []
         for idx, check_var in enumerate(self.check_vars):
-            if check_var.get():  # 确认框被选中
-                if idx >= len(self.file_info):  # 防止索引越界
-                    continue
+            if check_var.get() and idx < len(self.file_info):
                 filename, input_entry, action_btn = self.file_info[idx]
                 user_input = input_entry.get().strip()
                 if not user_input:
                     messagebox.showerror("输入错误", f"第 {idx+1} 行的输入内容不能为空")
                     return
-                # 立即禁用选中的按钮，防止重复提交
                 action_btn.config(state="disabled")
-                selected.append( (filename, user_input, action_btn) )
+                selected.append((filename, user_input, action_btn))
 
         if not selected:
             messagebox.showinfo("提示", "请先选择需要批量添加的行")
             return
 
-        # 提取参数并调用批量创建函数
-        filenames = [f for f, _, _ in selected]
-        user_inputs = [u for _, u, _ in selected]
-        buttons = [b for _, _, b in selected]
-        self.create_anki_cards(filenames, user_inputs, buttons)
+        filenames, user_inputs, buttons = zip(*selected)
+        # 延迟初始化OpenAI客户端
+        if not self.openai_client:
+            print("第一次初始化OpenAI客户端")
+            self.openai_client = OpenAIExplanation(**self.openai_config)
+            self.anki_connect.openai_client = self.openai_client  # 传递给AnkiConnect
+
+        self.anki_connect.create_anki_cards(filenames, user_inputs, buttons)  # 调用新模块方法
 
 
 if __name__ == "__main__":
