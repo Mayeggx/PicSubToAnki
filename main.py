@@ -285,5 +285,7 @@ class ImageViewerApp:
 
 if __name__ == "__main__":
     root = tk.Tk()
+    # 添加图标设置（新增代码）
+    root.iconbitmap("app.ico")  # 路径为项目根目录下的app.ico文件
     app = ImageViewerApp(root)
     root.mainloop()
