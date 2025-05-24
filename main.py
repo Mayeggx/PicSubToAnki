@@ -44,6 +44,10 @@ class ImageViewerApp:
         self.toggle_mode_btn = ttk.Button(self.toolbar, text="切换模式", command=self.toggle_mode)
         self.toggle_mode_btn.pack(side=tk.LEFT, padx=5, pady=5)
 
+        # 新增：删除所有图片按钮（在切换模式按钮右侧）
+        self.delete_btn = ttk.Button(self.toolbar, text="删除所有图片", command=self.delete_all_images)
+        self.delete_btn.pack(side=tk.LEFT, padx=5, pady=5)
+
         self.anki_connect = AnkiConnect()  # 初始化AnkiConnect实例
         # 新增：模式显示标签（在切换模式按钮右侧）
         current_mode = self.anki_connect.mode
@@ -246,6 +250,38 @@ class ImageViewerApp:
             self.openai_client = OpenAIExplanation(**self.openai_config)
             self.anki_connect.openai_client = self.openai_client  # 传递给AnkiConnect
         self.openai_client.mode = new_mode
+
+    def delete_all_images(self):
+        """删除当前文件夹下所有支持的图片文件并更新视图"""
+        if not self.folder_path:
+            messagebox.showinfo("提示", "请先选择需要操作的文件夹")
+            return
+    
+        # 二次确认删除
+        confirm = messagebox.askyesno("危险操作", "确认要删除当前文件夹下的所有图片吗？\n（支持格式：.png, .jpg, .jpeg, .gif, .bmp）")
+        if not confirm:
+            return
+    
+        valid_extensions = ('.png', '.jpg', '.jpeg', '.gif', '.bmp')
+        try:
+            deleted_count = 0
+            for filename in os.listdir(self.folder_path):
+                file_path = os.path.join(self.folder_path, filename)
+                # 仅删除文件且符合图片格式
+                if os.path.isfile(file_path) and os.path.splitext(filename)[1].lower() in valid_extensions:
+                    os.remove(file_path)
+                    deleted_count += 1
+    
+            if deleted_count > 0:
+                messagebox.showinfo("操作完成", f"已成功删除 {deleted_count} 张图片")
+            else:
+                messagebox.showinfo("操作完成", "当前文件夹下无支持的图片文件")
+    
+            # 清空并刷新视图（调用load_folder重新加载空文件夹）
+            self.load_folder()
+    
+        except Exception as e:
+            messagebox.showerror("删除失败", f"删除过程中发生错误：{str(e)}")
 
 if __name__ == "__main__":
     root = tk.Tk()
