@@ -6,6 +6,7 @@ import requests
 import base64
 import json
 import threading  # 导入线程模块
+import configparser  # 新增导入configparser模块
 from openai_utils import OpenAIExplanation
 from anki_connect import AnkiConnect  # 新增导入
 
@@ -67,11 +68,19 @@ class ImageViewerApp:
         for i in range(4):
             self.content_frame.columnconfigure(i, weight=1, uniform="cols")
 
+        # 从外置INI文件读取OpenAI配置（替换原硬编码）
+        config = configparser.ConfigParser()
+        config_path = os.path.join(os.path.dirname(__file__), "config.ini")  # 定位项目根目录的config.ini
+        if not os.path.exists(config_path):
+            messagebox.showerror("配置错误", f"未找到配置文件 {config_path}\n请按照文档创建配置文件")
+            raise FileNotFoundError(f"配置文件 {config_path} 不存在")
+        config.read(config_path, encoding="utf-8")
         self.openai_config = {
-            "api_key": "sk-dddfdbdf7ac747e2868af2a4fdb1346f",
-            "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-            "model_name": "qwen-plus"
+            "api_key": config.get("openai", "api_key"),
+            "base_url": config.get("openai", "base_url"),
+            "model_name": config.get("openai", "model_name")
         }
+
         self.openai_client = None
 
 

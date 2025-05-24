@@ -4,6 +4,7 @@ from PIL import Image
 from io import BytesIO
 import threading
 import os
+import configparser  # 新增导入配置解析库
 
 class AnkiConnect:
     def __init__(self, openai_client=None):
@@ -12,14 +13,25 @@ class AnkiConnect:
         self.voice_url = ""
         self.cards_name = ""
         self.mode = ""
-        self.set_mode('jp')
+        
+        # 新增：读取Anki相关配置
+        config = configparser.ConfigParser()
+        config_path = os.path.join(os.path.dirname(__file__), "config.ini")  # 定位配置文件
+        if not os.path.exists(config_path):
+            raise FileNotFoundError(f"配置文件 {config_path} 不存在")
+        config.read(config_path, encoding="utf-8")
+        self.jp_deck = config.get("anki", "jp_deck")  # 读取日语卡组配置
+        self.en_deck = config.get("anki", "en_deck")  # 读取英语卡组配置
+        
+        self.set_mode('jp')  # 初始化默认模式
 
     def set_mode(self, newmode):
         self.mode = newmode
-        if(self.mode == 'jp'):
-            self.cards_name = "日本語::ランダム::アニメ・マンガ・マスコミ"
-        elif(self.mode == 'en'):
-            self.cards_name = "English Vocabulary::A English Daily"
+        # 修改：使用配置文件中的值
+        if self.mode == 'jp':
+            self.cards_name = self.jp_deck
+        elif self.mode == 'en':
+            self.cards_name = self.en_deck
 
     def make_voice_url(self, word, pronun):
         if (self.mode == 'jp'):
