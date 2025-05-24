@@ -6,10 +6,19 @@ import requests
 import base64
 import json
 import threading  # 导入线程模块
+from openai_utils import OpenAIExplanation
 
 
 class ImageViewerApp:
     def __init__(self, root):
+
+        self.openai_config = {
+            "api_key": "sk-dddfdbdf7ac747e2868af2a4fdb1346f",
+            "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "model_name": "qwen-plus"
+        }
+        self.openai_client = OpenAIExplanation(**self.openai_config)
+
         self.root = root
         self.root.title("图片查看器")
         self.root.geometry("800x600")
@@ -19,8 +28,13 @@ class ImageViewerApp:
         self.toolbar = ttk.Frame(self.root)
         self.toolbar.pack(fill=tk.X)
 
+        # 选择文件夹按钮（原代码）
         self.select_btn = ttk.Button(self.toolbar, text="选择文件夹", command=self.load_folder)
         self.select_btn.pack(side=tk.LEFT, padx=5, pady=5)
+
+        # 新增：批量添加按钮（与选择文件夹按钮同一行，相邻放置）
+        self.batch_btn = ttk.Button(self.toolbar, text="批量添加", command=self.batch_add_cards)
+        self.batch_btn.pack(side=tk.LEFT, padx=5, pady=5)
 
         # 创建主内容区域
         self.canvas = tk.Canvas(self.root)
@@ -48,6 +62,8 @@ class ImageViewerApp:
     def load_folder(self):
         for widget in self.content_frame.winfo_children():
             widget.destroy()
+        self.file_info = []  # 清空历史记录
+        self.check_vars = []  # 清空确认框状态
 
         self.folder_path = filedialog.askdirectory()  # 保存文件夹路径
         if not self.folder_path:
@@ -57,9 +73,19 @@ class ImageViewerApp:
         image_files = [f for f in os.listdir(self.folder_path)
                        if os.path.splitext(f)[1].lower() in valid_extensions]
 
-        for row, filename in enumerate(image_files):
-            img_path = os.path.join(self.folder_path, filename)
+        # 修改列配置为5列（确认框+原4列）
+        for i in range(5):
+            self.content_frame.columnconfigure(i, weight=1, uniform="cols")
 
+        for row, filename in enumerate(image_files):
+            # 新增：确认框列（调整sticky参数为居中）
+            check_var = tk.BooleanVar()
+            self.check_vars.append(check_var)
+            check_btn = ttk.Checkbutton(self.content_frame, variable=check_var)
+            check_btn.grid(row=row, column=0, sticky="", padx=5, pady=5)  # sticky改为空字符串实现居中
+
+            # 原组件列号后移1位（0→1, 1→2, 2→3, 3→4）
+            img_path = os.path.join(self.folder_path, filename)
             try:
                 with Image.open(img_path) as img:
                     img.thumbnail((100, 100))
@@ -70,26 +96,38 @@ class ImageViewerApp:
 
             img_label = ttk.Label(self.content_frame, image=tk_img)
             img_label.image = tk_img
-            img_label.grid(row=row, column=0, sticky="nsew", padx=5, pady=5)
+            img_label.grid(row=row, column=1, sticky="nsew", padx=5, pady=5)  # 列号改为1
 
-            name_entry = ttk.Entry(self.content_frame)
-            name_entry.insert(0, filename)
-            name_entry.config(state="readonly")
-            name_entry.grid(row=row, column=1, sticky="nsew", padx=5, pady=5)
+            # 原name_label（第三列）修改为可换行、可选中的Text组件（新增居中对齐）
+            text_widget = tk.Text(
+                self.content_frame,
+                wrap="word",  # 按单词自动换行
+                width=20,      # 宽度（约20个字符）
+                height=3,      # 高度（最多3行）
+                state="disabled",  # 只读状态
+                bg="systembuttonface",  # 背景色与系统按钮一致
+                bd=0,          # 无边框
+                font=ttk.Style().lookup("TLabel", "font")  # 继承Label字体
+            )
+            # 插入文本时临时启用编辑状态
+            text_widget.config(state="normal")
+            text_widget.insert("1.0", filename)  # 在文本框开头插入文件名
+            text_widget.config(state="disabled")  # 恢复只读状态
+            text_widget.grid(row=row, column=2, sticky="nsew", padx=5, pady=5)  # 列号保持为2
 
             input_entry = ttk.Entry(self.content_frame)
-            input_entry.grid(row=row, column=2, sticky="nsew", padx=5, pady=5)
+            input_entry.grid(row=row, column=3, sticky="nsew", padx=5, pady=5)  # 列号改为3
 
-            # 修改为tk.Button以便直接设置背景色（ttk.Button样式控制复杂）
             action_btn = tk.Button(
                 self.content_frame,
                 text="创建卡片",
-                state="normal"  # 初始状态为可用
+                state="normal"
             )
-            # 使用默认参数绑定当前按钮对象到lambda，并传递input_entry
-            action_btn['command'] = lambda f=filename, e=input_entry, btn=action_btn: self.handle_button_click(f, e,
-                                                                                                               btn)
-            action_btn.grid(row=row, column=3, sticky="nsew", padx=5, pady=5)
+            action_btn['command'] = lambda f=filename, e=input_entry, btn=action_btn: self.handle_button_click(f, e, btn)
+            action_btn.grid(row=row, column=4, sticky="nsew", padx=5, pady=5)  # 列号改为4
+
+            # 保存当前行信息（无需修改file_info，因为不影响后续逻辑）
+            self.file_info.append( (filename, input_entry, action_btn) )
 
         self.content_frame.rowconfigure(len(image_files), weight=1)
 
@@ -167,7 +205,7 @@ class ImageViewerApp:
         def async_task():
             # 调用DeepSeek API解释文件名
             raw_name = os.path.splitext(filename)[0]
-            result = self.explain(raw_name, user_input)
+            result = self.openai_client.explain_single(raw_name, user_input)
             if result['error']:
                 print("返回失败")
                 # 操作失败时恢复按钮状态
@@ -197,7 +235,8 @@ class ImageViewerApp:
                 "音标": pronunciation,
                 "释义": meaning,
                 "笔记": note,
-                "例句": f'<img src="{compressed_filename}"><br>{example}'
+                "例句": f'<img src="{compressed_filename}"><br>{example}',
+                "发音": f'[sound:https://assets.languagepod101.com/dictionary/japanese/audiomp3.php?kanji={word}&kana={pronunciation}]'
             }
 
             # 创建笔记
@@ -222,113 +261,113 @@ class ImageViewerApp:
 
         threading.Thread(target=async_task, daemon=True).start()
 
-    def explain(self, subtitle, key):
-        """使用DeepSeek API查询单词信息并返回结构化数据"""
-        import openai
-        from openai import OpenAI
-        import json
+    def create_anki_cards(self, filenames, user_inputs, buttons):
+        """异步批量创建Anki卡片"""
 
-        # 初始化返回结构
-        result = {
-            "单词": "",
-            "音标": "",
-            "意义": "",
-            "错误": None
-        }
+        def async_task():
+            # 验证输入列表长度一致
+            if not filenames or len(filenames) != len(user_inputs) or len(filenames) != len(buttons):
+                self.root.after(0, lambda: messagebox.showerror("输入错误", "文件名、用户输入和按钮数量必须一致"))
+                for btn in buttons:
+                    self.root.after(0, btn.config, {'state': 'normal'})
+                return
 
-        client = OpenAI(
-            api_key="sk-5be20fcb377042bb9788055b7e24787a",
-            base_url="https://api.deepseek.com"
-        )
+            # 准备批量查询
+            raw_names = [os.path.splitext(filename)[0] for filename in filenames]
 
-        try:
-            # 构造精准提示词
-            prompt = f"""请根据提供的单词返回以下结构化信息：
-    1. 日文单词原型（如果是变形，返回原形）
-    2. 日文的发音
-    3. 日文的释义（不包含单词本身）
-    4. 当前的例句，并将和单词的部分用<b>key</b>的形式包围
-    5. 用中文结合语境解释一下当前单词的意思
+            # 调用批量API解析单词
+            results = self.openai_client.explain_batch(raw_names, user_inputs)
 
-    示例输入：
-    例句：連絡先 聞くの忘れたって わめいてたよ
-    单词：わめいて
-    （单词存在于例句之中）
-    示例格式：
-    {{
-        "单词": "喚く",
-        "音标": "わめく",
-        "意义": "①大声でさけぶ。②騒ぎ立てる。"
-        "例句": "連絡先 聞くの忘れたって　<b>わめいて</b>たよ"
-        "笔记": "「わめいてた」是动词「わめく」（叫嚷、吵闹）的过去进行时，表示“（当时）在大声抱怨/嚷嚷”。句中指对方因忘记询问联系方式而焦急或生气地吵闹，带有责备或夸张语气。"
-        "发音": f'[sound:https://assets.languagepod101.com/dictionary/japanese/audiomp3.php?kanji={word}&kana={pronunciation}]'
-    }}
-    当前输入：
-    例句：{subtitle}
-    单词：{key}
-    请给出对应的输出"""
+            # 处理API结果
+            success_count = 0
+            for i, (filename, user_input, btn, result) in enumerate(zip(filenames, user_inputs, buttons, results)):
+                if result.get('error'):
+                    print(f"第 {i + 1} 个单词解析失败: {result['error']}")
+                    # 保持按钮禁用，仅修改显示状态
+                    self.root.after(0, btn.config, {'state': 'disabled', 'bg': 'systembuttonface', 'text': '创建失败'})
+                    continue
 
-            print(f"正在查询单词：{key}")
-            response = client.chat.completions.create(
-                model="deepseek-chat",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "你是一个专业的日语词典助手，能够准确返回单词信息的JSON格式数据"
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
+                word = result['word']
+                pronunciation = result['pronunciation']
+                meaning = result['meaning']
+                example = result['example']
+                note = result['note']
+
+                # 存储压缩后的图片到Anki
+                media_result = self.store_media_file(filename)
+                if not media_result or media_result.get('response') is None or media_result.get('response').get(
+                        'error'):
+                    error_msg = media_result.get('response').get('error') if media_result else "未知错误"
+                    self.root.after(0, messagebox.showerror, "图片上传失败", f"无法上传图片: {error_msg}")
+                    self.root.after(0, btn.config, {'state': 'normal', 'bg': 'systembuttonface', 'text': '创建失败'})
+                    continue
+
+                compressed_filename = media_result['filename']
+
+                # 构建卡片内容
+                fields = {
+                    "单词": word,
+                    "音标": pronunciation,
+                    "释义": meaning,
+                    "笔记": note,
+                    "例句": f'<img src="{compressed_filename}"><br>{example}',
+                    "发音": f'[sound:https://assets.languagepod101.com/dictionary/japanese/audiomp3.php?kanji={word}&kana={pronunciation}]'
+                }
+
+                # 创建笔记
+                note_data = {
+                    "deckName": "Default",
+                    "modelName": "划词助手Antimoon模板",
+                    "fields": fields,
+                    "options": {
+                        "allowDuplicate": False
                     }
-                ],
-                temperature=0.1,
-                stream=False
-            )
+                }
 
-            # 解析响应内容
-            response_text = response.choices[0].message.content.strip()
-            print(f"收到原始响应：{response_text}")
+                response = self.anki_request('addNote', note=note_data)
+                if response and not response.get('error'):
+                    success_count += 1
+                    # 保持按钮禁用，显示成功状态
+                    self.root.after(0, btn.config, {'state': 'disabled', 'bg': 'green', 'text': '已创建'})
+                else:
+                    error = response.get('error') if response else "未知错误"
+                    self.root.after(0, messagebox.showerror, "创建失败", f"无法创建卡片: {error}")
+                    # 保持按钮禁用，显示失败状态
+                    self.root.after(0, btn.config, {'state': 'disabled', 'bg': 'systembuttonface', 'text': '创建失败'})
 
-            # 尝试提取JSON内容（处理可能的代码块格式）
-            json_str = response_text.split("```json")[-1].split("```")[0].strip()
-            word_info = json.loads(json_str)
+            # 全部处理完成后显示摘要
+            if success_count > 0:
+                self.root.after(0, lambda: messagebox.showinfo("批量创建结果",
+                                                               f"成功创建 {success_count}/{len(filenames)} 张卡片"))
 
-            # 提取字段
-            result["单词"] = word_info.get("单词", "")
-            result["音标"] = word_info.get("音标", "")
-            result["意义"] = word_info.get("意义", "")
-            result["例句"] = word_info.get("例句", "")
-            result["笔记"] = word_info.get("笔记", "")
+        threading.Thread(target=async_task, daemon=True).start()
 
-        except json.JSONDecodeError as e:
-            error_msg = f"JSON解析失败：{str(e)}"
-            print(error_msg)
-            result["错误"] = error_msg
-        except KeyError as e:
-            error_msg = f"缺少必要字段：{str(e)}"
-            print(error_msg)
-            result["错误"] = error_msg
-        except Exception as e:
-            error_msg = f"API调用失败：{str(e)}"
-            print(error_msg)
-            result["错误"] = error_msg
+    def batch_add_cards(self):
+        """处理批量添加按钮点击事件"""
+        # 收集选中的行
+        selected = []
+        for idx, check_var in enumerate(self.check_vars):
+            if check_var.get():  # 确认框被选中
+                if idx >= len(self.file_info):  # 防止索引越界
+                    continue
+                filename, input_entry, action_btn = self.file_info[idx]
+                user_input = input_entry.get().strip()
+                if not user_input:
+                    messagebox.showerror("输入错误", f"第 {idx+1} 行的输入内容不能为空")
+                    return
+                # 立即禁用选中的按钮，防止重复提交
+                action_btn.config(state="disabled")
+                selected.append( (filename, user_input, action_btn) )
 
-        # 记录到变量（根据调用需求选择以下任一方式）
-        word = result["单词"]
-        pronunce = result["音标"]
-        meaning = result["意义"]
-        example = result["例句"]
-        note = result["笔记"]
+        if not selected:
+            messagebox.showinfo("提示", "请先选择需要批量添加的行")
+            return
 
-        # 返回结构化的数据
-        return {
-            "word": word,
-            "pronunciation": pronunce,
-            "meaning": meaning,
-            "example": example,
-            "note": note,
-            "error": result["错误"]
-        }
+        # 提取参数并调用批量创建函数
+        filenames = [f for f, _, _ in selected]
+        user_inputs = [u for _, u, _ in selected]
+        buttons = [b for _, _, b in selected]
+        self.create_anki_cards(filenames, user_inputs, buttons)
 
 
 if __name__ == "__main__":
