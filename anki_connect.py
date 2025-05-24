@@ -22,7 +22,19 @@ class AnkiConnect:
         config.read(config_path, encoding="utf-8")
         self.jp_deck = config.get("anki", "jp_deck")  # 读取日语卡组配置
         self.en_deck = config.get("anki", "en_deck")  # 读取英语卡组配置
-        
+        self.model_name = config.get("anki", "model_name")
+
+
+        self.fields = {
+            "word": config.get("anki", "word_field"),
+            "pronunciation": config.get("anki", "pronunciation_field"),
+            "meaning": config.get("anki", "meaning_field"),
+            "note": config.get("anki", "note_field"),
+            "example": config.get("anki", "example_field"),
+            "voice": config.get("anki", "voice_field")
+        }
+
+
         self.set_mode('jp')  # 初始化默认模式
 
     def set_mode(self, newmode):
@@ -106,17 +118,17 @@ class AnkiConnect:
 
             compressed_filename = media_result['filename']
             fields = {
-                "单词": result['word'],
-                "音标": result['pronunciation'],
-                "释义": result['meaning'],
-                "笔记": result['note'],
-                "例句": f'<img src="{compressed_filename}"><br>{result["example"]}',
-                "发音": self.make_voice_url(result['word'],result['pronunciation'])
+                self.fields["word"]: result['word'],
+                self.fields["pronunciation"]: result['pronunciation'],
+                self.fields["meaning"]: result['meaning'],
+                self.fields["note"]: result['note'],
+                self.fields["example"]: f'<img src="{compressed_filename}"><br>{result["example"]}',
+                self.fields["voice"]: self.make_voice_url(result['word'], result['pronunciation'])
             }
 
             note = {
                 "deckName": self.cards_name,
-                "modelName": "划词助手Antimoon模板",
+                "modelName": self.model_name,
                 "fields": fields,
                 "options": {"allowDuplicate": True}
             }
@@ -154,17 +166,17 @@ class AnkiConnect:
 
                 compressed_filename = media_result['filename']
                 fields = {
-                    "单词": result['word'],
-                    "音标": result['pronunciation'],
-                    "释义": result['meaning'],
-                    "笔记": result['note'],
-                    "例句": f'<img src="{compressed_filename}"><br>{result["example"]}',
-                    "发音": self.make_voice_url(result['word'],result['pronunciation'])
+                    self.fields["word"]: result['word'],
+                    self.fields["pronunciation"]: result['pronunciation'],
+                    self.fields["meaning"]: result['meaning'],
+                    self.fields["note"]: result['note'],
+                    self.fields["example"]: f'<img src="{compressed_filename}"><br>{result["example"]}',
+                    self.fields["voice"]: self.make_voice_url(result['word'], result['pronunciation'])
                 }
 
                 note_data = {
                     "deckName": self.cards_name,
-                    "modelName": "划词助手Antimoon模板",
+                    "modelName": self.model_name,
                     "fields": fields,
                     "options": {"allowDuplicate": True}
                 }
