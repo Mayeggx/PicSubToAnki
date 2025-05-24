@@ -12,12 +12,6 @@ from openai_utils import OpenAIExplanation
 class ImageViewerApp:
     def __init__(self, root):
 
-        self.openai_config = {
-            "api_key": "sk-dddfdbdf7ac747e2868af2a4fdb1346f",
-            "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-            "model_name": "qwen-plus"
-        }
-        self.openai_client = OpenAIExplanation(**self.openai_config)
 
         self.root = root
         self.root.title("图片查看器")
@@ -52,6 +46,13 @@ class ImageViewerApp:
 
         for i in range(4):
             self.content_frame.columnconfigure(i, weight=1, uniform="cols")
+
+        self.openai_config = {
+            "api_key": "sk-dddfdbdf7ac747e2868af2a4fdb1346f",
+            "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "model_name": "qwen-plus"
+        }
+        self.openai_client = None  # 初始化为None，延迟初始化
 
     def on_canvas_configure(self, event):
         self.canvas.itemconfig("frame", width=event.width)
@@ -201,8 +202,12 @@ class ImageViewerApp:
 
     def create_anki_card(self, filename, user_input, btn):  # 新增按钮参数
         """异步创建Anki卡片（使用压缩后的图片+文件名解释）"""
-
         def async_task():
+            # 延迟初始化OpenAI客户端（首次调用时初始化）
+            if not self.openai_client:
+                print("第一次初始化OpenAI客户端")
+                self.openai_client = OpenAIExplanation(**self.openai_config)
+
             # 调用DeepSeek API解释文件名
             raw_name = os.path.splitext(filename)[0]
             result = self.openai_client.explain_single(raw_name, user_input)
@@ -274,6 +279,11 @@ class ImageViewerApp:
 
             # 准备批量查询
             raw_names = [os.path.splitext(filename)[0] for filename in filenames]
+
+            # 延迟初始化OpenAI客户端（首次调用时初始化）
+            if not self.openai_client:
+                print("第一次初始化OpenAI客户端")
+                self.openai_client = OpenAIExplanation(**self.openai_config)
 
             # 调用批量API解析单词
             results = self.openai_client.explain_batch(raw_names, user_inputs)
