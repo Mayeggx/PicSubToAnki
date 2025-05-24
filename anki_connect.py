@@ -20,9 +20,13 @@ class AnkiConnect:
         if not os.path.exists(config_path):
             raise FileNotFoundError(f"配置文件 {config_path} 不存在")
         config.read(config_path, encoding="utf-8")
-        self.jp_deck = config.get("anki", "jp_deck")  # 读取日语卡组配置
-        self.en_deck = config.get("anki", "en_deck")  # 读取英语卡组配置
+        # 读取Anki相关配置（新增压缩参数）
+        self.jp_deck = config.get("anki", "jp_deck")
+        self.en_deck = config.get("anki", "en_deck")
         self.model_name = config.get("anki", "model_name")
+        self.max_width = config.getint("anki", "max_width")  # 新增：读取最大宽度（整数）
+        self.max_height = config.getint("anki", "max_height")  # 新增：读取最大高度（整数）
+        self.image_quality = config.getint("anki", "image_quality")  # 新增：读取压缩质量（整数）
 
 
         self.fields = {
@@ -73,7 +77,8 @@ class AnkiConnect:
 
         try:
             with Image.open(img_path) as img:
-                max_size = (320, 240)
+                # 修改：使用配置文件中的尺寸
+                max_size = (self.max_width, self.max_height)
                 img.thumbnail(max_size)
 
                 if img.mode in ('RGBA', 'LA'):
@@ -84,7 +89,8 @@ class AnkiConnect:
                     img = img.convert('RGB')
 
                 img_buffer = BytesIO()
-                img.save(img_buffer, format='JPEG', quality=60)
+                # 修改：使用配置文件中的质量参数
+                img.save(img_buffer, format='JPEG', quality=self.image_quality)
                 img_data = img_buffer.getvalue()
                 img_b64 = base64.b64encode(img_data).decode("utf-8")
 
