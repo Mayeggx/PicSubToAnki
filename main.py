@@ -14,6 +14,7 @@ from anki_connect import AnkiConnect  # 新增导入
 class ImageViewerApp:
     def __init__(self, root):
 
+
         self.root = root
         self.root.title("图片字幕转Anki卡片")
         self.root.geometry("800x600")
@@ -46,13 +47,22 @@ class ImageViewerApp:
         # 新增：删除所有图片按钮（在切换模式按钮右侧）
         self.delete_btn = ttk.Button(self.toolbar, text="删除所有图片", command=self.delete_all_images)
         self.delete_btn.pack(side=tk.LEFT, padx=5, pady=5)
-
         self.anki_connect = AnkiConnect()  # 初始化AnkiConnect实例
+        
+        # 新增：添加模板按钮（在删除所有图片按钮右侧）
+        # self.add_model_btn = ttk.Button(
+        #     self.toolbar,
+        #     text="添加模板",
+        #     command=lambda: self.anki_connect.add_model()  # 直接调用anki_connect的add_model方法
+        # )
+        # self.add_model_btn.pack(side=tk.LEFT, padx=5, pady=5)
+
         # 新增：模式显示标签（在切换模式按钮右侧）
         current_mode = self.anki_connect.mode
         mode_text = "日语模式" if current_mode == "jp" else "英语模式" if current_mode == "en" else "未知模式"
         self.mode_label = ttk.Label(self.toolbar, text=mode_text)
         self.mode_label.pack(side=tk.LEFT, padx=5, pady=5)
+
 
         # 创建主内容区域
         self.canvas = tk.Canvas(self.root)
@@ -86,6 +96,7 @@ class ImageViewerApp:
 
         self.openai_client = None
 
+
     def on_canvas_configure(self, event):
         self.canvas.itemconfig("frame", width=event.width)
 
@@ -104,8 +115,19 @@ class ImageViewerApp:
             return
 
         valid_extensions = ('.png', '.jpg', '.jpeg', '.gif', '.bmp')
-        image_files = [f for f in os.listdir(self.folder_path)
-                       if os.path.splitext(f)[1].lower() in valid_extensions]
+        
+        # 新增：获取文件并按创建时间排序（老文件在前）
+        image_files_with_time = []
+        for filename in os.listdir(self.folder_path):
+            file_path = os.path.join(self.folder_path, filename)
+            # 仅处理符合格式的文件
+            if os.path.isfile(file_path) and os.path.splitext(filename)[1].lower() in valid_extensions:
+                create_time = os.path.getctime(file_path)  # 获取Windows系统下的文件创建时间
+                image_files_with_time.append((filename, create_time))
+        
+        # 按创建时间升序排序（时间小的在前，即更早创建的文件）
+        image_files_with_time.sort(key=lambda x: x[1])
+        image_files = [item[0] for item in image_files_with_time]  # 提取排序后的文件名列表
 
         # 修改列配置为5列（确认框+原4列）
         for i in range(5):
@@ -113,11 +135,11 @@ class ImageViewerApp:
 
         # 新增：添加标题行（row=0）
         title_config = [
-            ("确认框", 0),  # 列0：确认框标题
-            ("图片", 1),  # 列1：图片标题
-            ("文件名", 2),  # 列2：文件名标题
-            ("单词", 3),  # 列3：单词输入框标题
-            ("操作", 4)  # 列4：操作按钮标题
+            ("确认框", 0),   # 列0：确认框标题
+            ("图片", 1),     # 列1：图片标题
+            ("文件名", 2),   # 列2：文件名标题
+            ("单词", 3),     # 列3：单词输入框标题
+            ("操作", 4)      # 列4：操作按钮标题
         ]
         for text, col in title_config:
             title_label = ttk.Label(
@@ -156,16 +178,18 @@ class ImageViewerApp:
             text_widget = tk.Text(
                 self.content_frame,
                 wrap="word",  # 按单词自动换行
-                width=20,  # 宽度（约20个字符）
-                height=3,  # 高度（最多3行）
+                width=20,      # 宽度（约20个字符）
+                height=3,      # 高度（最多3行）
                 state="disabled",  # 只读状态
                 bg="systembuttonface",  # 背景色与系统按钮一致
-                bd=0,  # 无边框
+                bd=0,          # 无边框
                 font=ttk.Style().lookup("TLabel", "font")  # 继承Label字体
             )
             # 插入文本时临时启用编辑状态
             text_widget.config(state="normal")
-            text_widget.insert("1.0", filename)  # 在文本框开头插入文件名
+            # 修改：去除文件名后缀
+            base_name = os.path.splitext(filename)[0]  # 获取不带扩展名的文件名
+            text_widget.insert("1.0", base_name)  # 插入处理后的文件名
             text_widget.config(state="disabled")  # 恢复只读状态
             text_widget.grid(row=row, column=2, sticky="nsew", padx=5, pady=5)  # 列2
 
@@ -177,12 +201,11 @@ class ImageViewerApp:
                 text="创建卡片",
                 state="normal"
             )
-            action_btn['command'] = lambda f=filename, e=input_entry, btn=action_btn: self.handle_button_click(f, e,
-                                                                                                               btn)
+            action_btn['command'] = lambda f=filename, e=input_entry, btn=action_btn: self.handle_button_click(f, e, btn)
             action_btn.grid(row=row, column=4, sticky="nsew", padx=5, pady=5)  # 列4（对应"操作"标题列）
 
             # 保存当前行信息（无需修改file_info，因为不影响后续逻辑）
-            self.file_info.append((filename, input_entry, action_btn))
+            self.file_info.append( (filename, input_entry, action_btn) )
 
         self.content_frame.rowconfigure(len(image_files) + 1, weight=1)  # 调整行权重（标题行+文件行）
 
@@ -208,7 +231,7 @@ class ImageViewerApp:
                 filename, input_entry, action_btn = self.file_info[idx]
                 user_input = input_entry.get().strip()
                 if not user_input:
-                    messagebox.showerror("输入错误", f"第 {idx + 1} 行的输入内容不能为空")
+                    messagebox.showerror("输入错误", f"第 {idx+1} 行的输入内容不能为空")
                     return
                 action_btn.config(state="disabled")
                 selected.append((filename, user_input, action_btn))
@@ -257,13 +280,12 @@ class ImageViewerApp:
         if not self.folder_path:
             messagebox.showinfo("提示", "请先选择需要操作的文件夹")
             return
-
+    
         # 二次确认删除
-        confirm = messagebox.askyesno("危险操作",
-                                      "确认要删除当前文件夹下的所有图片吗？\n（支持格式：.png, .jpg, .jpeg, .gif, .bmp）")
+        confirm = messagebox.askyesno("危险操作", "确认要删除当前文件夹下的所有图片吗？\n（支持格式：.png, .jpg, .jpeg, .gif, .bmp）")
         if not confirm:
             return
-
+    
         valid_extensions = ('.png', '.jpg', '.jpeg', '.gif', '.bmp')
         try:
             deleted_count = 0
@@ -273,15 +295,15 @@ class ImageViewerApp:
                 if os.path.isfile(file_path) and os.path.splitext(filename)[1].lower() in valid_extensions:
                     os.remove(file_path)
                     deleted_count += 1
-
+    
             if deleted_count > 0:
                 messagebox.showinfo("操作完成", f"已成功删除 {deleted_count} 张图片")
             else:
                 messagebox.showinfo("操作完成", "当前文件夹下无支持的图片文件")
-
+    
             # 清空并刷新视图（调用load_folder重新加载空文件夹）
             self.load_folder()
-
+    
         except Exception as e:
             messagebox.showerror("删除失败", f"删除过程中发生错误：{str(e)}")
 
@@ -289,7 +311,6 @@ class ImageViewerApp:
     def open_image(self, image_path):
         """使用系统默认程序打开图片文件"""
         os.startfile(image_path)
-
 
 if __name__ == "__main__":
     root = tk.Tk()
