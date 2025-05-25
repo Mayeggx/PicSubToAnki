@@ -61,7 +61,7 @@ PicSubToAnki 是一款用于将图片中的字幕/单词信息快速转换为 An
 
 ## 五、使用流程
 ### 步骤 0：安装依赖
-在项目根目录（与 `requirements.txt` 同级）中，通过命令行执行以下命令安装所需依赖：
+在项目根目录（与 `requirements.txt` 同级）中，通过命令行执行以下命令安装所需依赖。也可以使用`install.cmd`安装：
 ```bash
 pip install -r requirements.txt
 ```
