@@ -2,7 +2,7 @@
 
 ## 零、前提情要
 用于处理以`当前字幕为文件名的截图文件`，将这种截图文件制作为anki卡片。
-为了获得这样的截图文件，请使用mpv播放器，并打开`mpv.conf`文件，
+为了获得这样的截图文件，请使用[mpv播放器](https://github.com/mpv-player/mpv)，并打开`mpv.conf`文件，
 加入设置`screenshot-template="%{sub-text}"`。这样就可以得到这款软件所需要的文件类型。
 
 ![需要文件示意图](resources/example.jpg)
