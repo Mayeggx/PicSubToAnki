@@ -49,6 +49,14 @@ class ImageViewerApp:
         self.delete_btn.pack(side=tk.LEFT, padx=5, pady=5)
         self.anki_connect = AnkiConnect()  # 初始化AnkiConnect实例
         
+        # 新增：打开配置文件按钮（在删除所有图片按钮右侧）
+        self.open_config_btn = ttk.Button(
+            self.toolbar,
+            text="打开配置文件",
+            command=self.open_config_file  # 绑定打开配置文件方法
+        )
+        self.open_config_btn.pack(side=tk.LEFT, padx=5, pady=5)
+
         # 新增：添加模板按钮（在删除所有图片按钮右侧）
         # self.add_model_btn = ttk.Button(
         #     self.toolbar,
@@ -311,6 +319,15 @@ class ImageViewerApp:
     def open_image(self, image_path):
         """使用系统默认程序打开图片文件"""
         os.startfile(image_path)
+
+    # 新增：打开配置文件方法
+    def open_config_file(self):
+        """用系统默认文本编辑器打开config.ini"""
+        config_path = os.path.join(os.path.dirname(__file__), "config.ini")
+        if os.path.exists(config_path):
+            os.startfile(config_path)  # Windows系统调用默认程序打开文件
+        else:
+            messagebox.showerror("文件不存在", "未找到配置文件config.ini\n请检查项目根目录是否存在该文件")
 
 if __name__ == "__main__":
     root = tk.Tk()
