@@ -107,7 +107,7 @@ pip install -r requirements.txt
 - **Q：发音链接无效？**  
   A：日语发音依赖 LanguagePod101 服务（可能因地区限制不可用）；英语发音依赖有道词典，部分生僻词可能无音频。
 
-## 七、prompt参考
+## 八、prompt参考
 - **日语prompt**：
 ```
 1. 日文单词原型（如果是变形，返回原形）
