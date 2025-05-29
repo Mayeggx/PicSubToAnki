@@ -41,8 +41,8 @@ class ImageViewerApp:
         self.select_none_btn.pack(side=tk.LEFT, padx=5, pady=5)
 
         # 新增：切换模式按钮（在取消全选按钮右侧）
-        self.toggle_mode_btn = ttk.Button(self.toolbar, text="切换模式", command=self.toggle_mode)
-        self.toggle_mode_btn.pack(side=tk.LEFT, padx=5, pady=5)
+        # self.toggle_mode_btn = ttk.Button(self.toolbar, text="切换模式", command=self.toggle_mode)
+        # self.toggle_mode_btn.pack(side=tk.LEFT, padx=5, pady=5)
 
         # 新增：删除所有图片按钮（在切换模式按钮右侧）
         self.delete_btn = ttk.Button(self.toolbar, text="删除所有图片", command=self.delete_all_images)
@@ -66,10 +66,10 @@ class ImageViewerApp:
         # self.add_model_btn.pack(side=tk.LEFT, padx=5, pady=5)
 
         # 新增：模式显示标签（在切换模式按钮右侧）
-        current_mode = self.anki_connect.mode
-        mode_text = "日语模式" if current_mode == "jp" else "英语模式" if current_mode == "en" else "未知模式"
-        self.mode_label = ttk.Label(self.toolbar, text=mode_text)
-        self.mode_label.pack(side=tk.LEFT, padx=5, pady=5)
+        # current_mode = self.anki_connect.mode
+        # mode_text = "日语模式" if current_mode == "jp" else "英语模式" if current_mode == "en" else "未知模式"
+        # self.mode_label = ttk.Label(self.toolbar, text=mode_text)
+        # self.mode_label.pack(side=tk.LEFT, padx=5, pady=5)
 
 
         # 创建主内容区域
@@ -224,11 +224,22 @@ class ImageViewerApp:
             return
 
         btn.config(state="disabled")
+
+
         # 延迟初始化OpenAI客户端
         if not self.openai_client:
             print("第一次初始化OpenAI客户端")
             self.openai_client = OpenAIExplanation(**self.openai_config)
             self.anki_connect.openai_client = self.openai_client  # 传递给AnkiConnect
+
+        if(ord(user_input[0]) > 10000):
+            print("当前模式为日语模式")
+            self.anki_connect.set_mode("jp")
+            self.openai_client.mode = "jp"
+        else:
+            print("当前模式为英语模式")
+            self.anki_connect.set_mode("en")
+            self.openai_client.mode = "en"
 
         self.anki_connect.create_anki_card(filename, user_input, btn)  # 调用新模块方法
 
@@ -255,6 +266,15 @@ class ImageViewerApp:
             self.openai_client = OpenAIExplanation(**self.openai_config)
             self.anki_connect.openai_client = self.openai_client  # 传递给AnkiConnect
 
+        if(ord(user_input[0]) > 10000):
+            print("当前模式为日语模式")
+            self.anki_connect.set_mode("jp")
+            self.openai_client.mode = "jp"
+        else:
+            print("当前模式为英语模式")
+            self.anki_connect.set_mode("en")
+            self.openai_client.mode = "en"
+
         self.anki_connect.create_anki_cards(filenames, user_inputs, buttons)  # 调用新模块方法
 
     def select_all(self):
@@ -268,20 +288,7 @@ class ImageViewerApp:
             check_var.set(False)  # 设置为未选中状态
 
     # 新增：切换模式方法
-    def toggle_mode(self):
-        current_mode = self.anki_connect.mode
-        new_mode = "en" if current_mode == "jp" else "jp"
 
-        self.anki_connect.set_mode(new_mode)
-        # 更新模式显示标签
-        mode_text = "日语模式" if new_mode == "jp" else "英语模式"
-        self.mode_label.config(text=mode_text)
-
-        if not self.openai_client:
-            print("第一次初始化OpenAI客户端")
-            self.openai_client = OpenAIExplanation(**self.openai_config)
-            self.anki_connect.openai_client = self.openai_client  # 传递给AnkiConnect
-        self.openai_client.mode = new_mode
 
     def delete_all_images(self):
         """删除当前文件夹下所有支持的图片文件并更新视图"""
