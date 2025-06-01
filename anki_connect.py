@@ -139,12 +139,54 @@ class AnkiConnect:
                 "options": {"allowDuplicate": True}
             }
 
-            response = self.anki_request('addNote', note=note)
-            print(response)
-            if response and not response.get('error'):
-                btn.config(bg='green', text='已创建')
+            # 新增：查询是否存在相同word字段的卡片
+            word_field = self.fields["word"]  # 获取配置中的word字段名（如"单词"）
+            word_value = fields[word_field]   # 当前要添加的单词值
+            # 构造Anki搜索查询（格式："字段名:字段值"）
+            search_query = f'{word_field}:{word_value}'
+            # 调用findNotes接口查询笔记ID
+            search_response = self.anki_request('findNotes', query=search_query)
+            print(f"查询[{word_value}]卡片响应: {search_response}")  # 打印查询结果
+
+            # 新增：获取第一张卡片ID并更新例句字段
+            if search_response and 'result' in search_response and search_response['result']:
+                note_id = search_response['result'][0]  # 获取第一张卡片ID
+                # 获取卡片详情
+                get_note_response = self.anki_request('notesInfo', notes=[note_id])
+                if get_note_response and not get_note_response.get('error') and 'result' in get_note_response:
+                    current_note = get_note_response['result'][0]
+                    # 提取原例句内容
+                    current_example = current_note['fields'][self.fields["example"]]['value']
+                    current_notes = current_note['fields'][self.fields["note"]]['value']
+                    current_meaning = current_note['fields'][self.fields["meaning"]]['value']
+                    # 拼接新例句（添加<br>分隔）
+                    new_example = f"""{current_example}<br>2.{result["example"]}<br><img src="{compressed_filename}">"""
+                    new_note = f"""{current_notes}<br>例句2含义：{result["note"]}"""
+                    new_meaning = f"""{current_meaning}<br>{result["meaning"]}"""
+                    # 更新例句字段
+                    update_response = self.anki_request('updateNoteFields', note={
+                        "id": note_id,
+                        "fields": {self.fields["example"]: new_example,
+                                   self.fields["note"]: new_note,
+                                   self.fields["meaning"]: new_meaning}
+                    })
+
+                    if update_response and not update_response.get('error'):
+                        print(f"成功更新卡片{note_id}的字段")
+                        btn.config(bg='green', text='已更新')
+                    else:
+                        print(f"更新失败: {update_response.get('error') if update_response else '无响应'}")
+                        btn.config(state="normal", text="更新失败")
+                else:
+                    print(f"获取卡片详情失败: {get_note_response.get('error') if get_note_response else '无响应'}")
+                    btn.config(state="normal", text="更新失败")
             else:
-                btn.config(state="normal", text="创建失败")
+                response = self.anki_request('addNote', note=note)
+                print(f"成功创建卡片：{response['result']}")
+                if response and not response.get('error'):
+                    btn.config(bg='green', text='已创建')
+                else:
+                    btn.config(state="normal", text="创建失败")
 
         threading.Thread(target=async_task, daemon=True).start()
 
@@ -187,12 +229,56 @@ class AnkiConnect:
                     "options": {"allowDuplicate": True}
                 }
 
-                response = self.anki_request('addNote', note=note_data)
-                if response and not response.get('error'):
-                    success_count += 1
-                    btn.config(bg='green', text='已创建')
+                # 新增：查询是否存在相同word字段的卡片
+                word_field = self.fields["word"]  # 获取配置中的word字段名（如"单词"）
+                word_value = fields[word_field]  # 当前要添加的单词值
+                # 构造Anki搜索查询（格式："字段名:字段值"）
+                search_query = f'{word_field}:{word_value}'
+                # 调用findNotes接口查询笔记ID
+                search_response = self.anki_request('findNotes', query=search_query)
+                print(f"查询[{word_value}]卡片响应: {search_response}")  # 打印查询结果
+
+                # 新增：获取第一张卡片ID并更新例句字段
+                if search_response and 'result' in search_response and search_response['result']:
+                    note_id = search_response['result'][0]  # 获取第一张卡片ID
+                    # 获取卡片详情
+                    get_note_response = self.anki_request('notesInfo', notes=[note_id])
+                    if get_note_response and not get_note_response.get('error') and 'result' in get_note_response:
+                        current_note = get_note_response['result'][0]
+                        # 提取原例句内容
+                        current_example = current_note['fields'][self.fields["example"]]['value']
+                        current_notes = current_note['fields'][self.fields["note"]]['value']
+                        current_meaning = current_note['fields'][self.fields["meaning"]]['value']
+                        # 拼接新例句（添加<br>分隔）
+                        new_example = f"""{current_example}<br>2.{result["example"]}<br><img src="{compressed_filename}">"""
+                        new_note = f"""{current_notes}<br>例句2含义：{result["note"]}"""
+                        new_meaning = f"""{current_meaning}<br>{result["meaning"]}"""
+                        # 更新例句字段
+                        update_response = self.anki_request('updateNoteFields', note={
+                            "id": note_id,
+                            "fields": {self.fields["example"]: new_example,
+                                       self.fields["note"]: new_note,
+                                       self.fields["meaning"]: new_meaning}
+                        })
+
+                        if update_response and not update_response.get('error'):
+                            success_count += 1
+                            print(f"成功更新卡片{note_id}的字段")
+                            btn.config(bg='green', text='已更新')
+                        else:
+                            print(f"更新失败: {update_response.get('error') if update_response else '无响应'}")
+                            btn.config(state="normal", text="更新失败")
+                    else:
+                        print(f"获取卡片详情失败: {get_note_response.get('error') if get_note_response else '无响应'}")
+                        btn.config(state="normal", text="更新失败")
                 else:
-                    btn.config(text='创建失败')
+                    response = self.anki_request('addNote', note=note_data)
+                    print(f"成功创建卡片：{response['result']}")
+                    if response and not response.get('error'):
+                        success_count += 1
+                        btn.config(bg='green', text='已创建')
+                    else:
+                        btn.config(state="normal", text="创建失败")
 
             if success_count > 0:
                 # 需通过main.py的root更新UI提示
