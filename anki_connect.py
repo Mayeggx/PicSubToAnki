@@ -128,7 +128,7 @@ class AnkiConnect:
                 self.fields["pronunciation"]: result['pronunciation'],
                 self.fields["meaning"]: result['meaning'],
                 self.fields["note"]: result['note'],
-                self.fields["example"]: f'<img src="{compressed_filename}"><br>{result["example"]}',
+                self.fields["example"]:  f'{result["example"]}<br><img src="{compressed_filename}">',
                 self.fields["voice"]: self.make_voice_url(result['word'], result['pronunciation'])
             }
 
@@ -218,7 +218,7 @@ class AnkiConnect:
                     self.fields["pronunciation"]: result['pronunciation'],
                     self.fields["meaning"]: result['meaning'],
                     self.fields["note"]: result['note'],
-                    self.fields["example"]: f'<img src="{compressed_filename}"><br>{result["example"]}',
+                    self.fields["example"]: f'{result["example"]}<br><img src="{compressed_filename}">',
                     self.fields["voice"]: self.make_voice_url(result['word'], result['pronunciation'])
                 }
 
